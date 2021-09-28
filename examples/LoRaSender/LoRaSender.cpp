@@ -1,6 +1,6 @@
 #include <string.h>
 #include <pico/stdlib.h>
-#include "LoRa-pico.h"
+#include "LoRa-RP2040.h"
 
 int main() {
 

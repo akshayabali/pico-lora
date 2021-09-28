@@ -2,7 +2,7 @@
 #include "pico/binary_info.h"
 #include "stdio.h"
 //Inlude Library
-#include "LoRa-pico.h"
+#include "LoRa-RP2040.h"
 
 int counter = 0;
 

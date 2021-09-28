@@ -27,7 +27,7 @@
 #include "string.h"
 #include "string"
 //Inlude Library
-#include "LoRa-pico.h"
+#include "LoRa-RP2040.h"
 
 using std::string;
 

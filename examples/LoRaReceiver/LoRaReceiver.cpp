@@ -3,7 +3,7 @@
 #include "pico/binary_info.h"
 
 //Inlude Library
-#include "LoRa-pico.h"
+#include "LoRa-RP2040.h"
 
 int main() {
 

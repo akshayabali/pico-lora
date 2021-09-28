@@ -1,4 +1,4 @@
-#include "LoRa-pico.h"
+#include "LoRa-RP2040.h"
 
 // registers
 #define REG_FIFO                 0x00

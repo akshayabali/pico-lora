@@ -24,7 +24,7 @@
 
 #include <string>
 //Inlude Library
-#include "LoRa-pico.h"
+#include "LoRa-RP2040.h"
 
 
 const int csPin = 7;          // LoRa radio chip select
