@@ -5,6 +5,7 @@ This library is written for RP2040 C++ SDK.
 
 ## Supported Hardware
  * RP2040 boards
+    * Raspberry Pi Pico
  * Semtech SX1276/77/78/79 based LoRa boards
 
 ### Default Pinout
