@@ -20,7 +20,7 @@ include(example_auto_set_url.cmake)
 add_subdirectory(src)
 
 # Hardware-specific examples in subdirectories:
-add_subdirectory(code)
+add_subdirectory(examples)
 
 add_compile_options(-Wall
         -Wno-format          # int != int32_t as far as the compiler is concerned because gcc has int32_t as long int
