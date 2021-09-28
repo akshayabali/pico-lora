@@ -1,0 +1,16 @@
+cmake_minimum_required(VERSION 3.12)
+
+# Pull in SDK (must be before project)
+
+add_subdirectory(LoRaReceiver)
+add_subdirectory(LoRaSender)
+add_subdirectory(LoRaDumpRegisters)
+add_subdirectory(LoRaDuplex)
+add_subdirectory(LoRaDuplexCallback)
+add_subdirectory(LoRaReceiverCallback)
+add_subdirectory(LoRaSenderNonBlocking)
+add_subdirectory(LoRaSenderNonBlockingCallback)
+add_subdirectory(LoRaSetSpread)
+add_subdirectory(LoRaSimpleGateway)
+add_subdirectory(LoRaSetSyncWord)
+add_subdirectory(LoRaSimpleNode)
