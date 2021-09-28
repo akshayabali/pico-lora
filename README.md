@@ -1,4 +1,4 @@
-# LoRa-pi-pico 
+# LoRa-RP2040
 LoRa communication Library for Raspberry Pi RP2040 Mictrocontroller. 
 
 This library is written for RP2040 C++ SDK.
@@ -29,7 +29,7 @@ Default Pinout can be overrided with setPins() function
 2. Download module from git and open directory
 ```sh
 git clone https://github.com/akshayabali/LoRa-pi-pico.git
-cd ./Lora-pi-pico
+cd ./LoRa-RP2040
 ```
 3. Set `PICO_SDK_PATH`
 ```sh
