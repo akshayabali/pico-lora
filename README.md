@@ -47,4 +47,4 @@ make
 Currently this is only tested on Raspberry Pi Pico and Semtech1278 board. Feel free to reach out for any bugs or support.
 
 ## References
-This project is based on LoRa Library for Arduino:[sandeepmistry/arduino-LoRa](https://github.com/sandeepmistry/arduino-LoRa)
+This [project](https://github.com/akshayabali/LoRa-RP2040) is based on LoRa Library for Arduino:[sandeepmistry/arduino-LoRa](https://github.com/sandeepmistry/arduino-LoRa)
