@@ -1,4 +1,4 @@
-# LoRa-RP2040
+# pico-lora
 LoRa communication library for Raspberry Pi RP2040 Microcontroller. 
 
 This library is written for RP2040 C++ SDK.
