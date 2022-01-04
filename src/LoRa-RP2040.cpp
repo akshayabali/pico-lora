@@ -723,6 +723,7 @@ uint8_t LoRaClass::singleTransfer(uint8_t address, uint8_t value)
 
 void LoRaClass::onDio0Rise(uint gpio, uint32_t events)
 {
+  gpio_acknowledge_irq(gpio, events);
   LoRa.handleDio0Rise();
 }
 
