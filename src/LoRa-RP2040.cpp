@@ -673,6 +673,7 @@ void LoRaClass::handleDio0Rise()
 
   // clear IRQ's
   writeRegister(REG_IRQ_FLAGS, irqFlags);
+  writeRegister(REG_IRQ_FLAGS, irqFlags);
 
   if ((irqFlags & IRQ_PAYLOAD_CRC_ERROR_MASK) == 0) {
 
