@@ -227,6 +227,7 @@ int LoRaClass::parsePacket(int size)
 
   // clear IRQ's
   writeRegister(REG_IRQ_FLAGS, irqFlags);
+  writeRegister(REG_IRQ_FLAGS, irqFlags);
   
   if ((irqFlags & IRQ_RX_DONE_MASK) && (irqFlags & IRQ_PAYLOAD_CRC_ERROR_MASK) == 0) {
     // received a packet
@@ -671,6 +672,7 @@ void LoRaClass::handleDio0Rise()
   int irqFlags = readRegister(REG_IRQ_FLAGS);
 
   // clear IRQ's
+  writeRegister(REG_IRQ_FLAGS, irqFlags);
   writeRegister(REG_IRQ_FLAGS, irqFlags);
 
   if ((irqFlags & IRQ_PAYLOAD_CRC_ERROR_MASK) == 0) {
