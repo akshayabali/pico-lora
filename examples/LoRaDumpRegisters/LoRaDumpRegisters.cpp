@@ -8,7 +8,7 @@ int main(){
 
   stdio_init_all();
   
-  printf("LoRa Dump Registers");
+  printf("LoRa Dump Registers\n");
 
   // override the default CS, reset, and IRQ pins (optional)
   // LoRa.setPins(7, 6, 1); // set CS, reset, IRQ pin
