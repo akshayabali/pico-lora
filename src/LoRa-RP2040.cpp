@@ -649,7 +649,7 @@ void LoRaClass::setSPIFrequency(uint32_t frequency)
 void LoRaClass::dumpRegisters()
 {
   for (int i = 0; i < 128; i++) {
-    printf("0x%x: 0x%x",i,readRegister(i));
+    printf("0x%x: 0x%x\n",i,readRegister(i));
   }
 }
 
