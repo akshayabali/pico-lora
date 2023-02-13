@@ -29,8 +29,8 @@ Default Pinout can be overrided with setPins() function
 1. [Set up the Pico C/C++ SDK](https://github.com/raspberrypi/pico-sdk)
 2. Download module from git and open directory
 ```sh
-git clone https://github.com/akshayabali/LoRa-pi-pico.git
-cd ./LoRa-RP2040
+git clone https://github.com/akshayabali/pico-lora.git
+cd ./pico-lora
 ```
 3. Set `PICO_SDK_PATH`
 ```sh
