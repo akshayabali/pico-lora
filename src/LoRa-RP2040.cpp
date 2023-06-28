@@ -7,8 +7,10 @@
 #define REG_FRF_MID              0x07
 #define REG_FRF_LSB              0x08
 #define REG_PA_CONFIG            0x09
+#define IRQ_CAD_DETECTED_MASK    0x01
 #define REG_OCP                  0x0b
 #define REG_LNA                  0x0c
+#define IRQ_CAD_DONE_MASK        0x04
 #define REG_FIFO_ADDR_PTR        0x0d
 #define REG_FIFO_TX_BASE_ADDR    0x0e
 #define REG_FIFO_RX_BASE_ADDR    0x0f
@@ -36,7 +38,7 @@
 #define REG_DIO_MAPPING_1        0x40
 #define REG_VERSION              0x42
 #define REG_PA_DAC               0x4d
-
+#define MODE_CAD                 0x07
 // modes
 #define MODE_LONG_RANGE_MODE     0x80
 #define MODE_SLEEP               0x00
@@ -60,34 +62,34 @@
 #define MAX_PKT_LENGTH           255
 
 #if (ESP8266 || ESP32)
-    #define ISR_PREFIX ICACHE_RAM_ATTR
+#define ISR_PREFIX ICACHE_RAM_ATTR
 #else
-    #define ISR_PREFIX
+#define ISR_PREFIX
 #endif
 
-
-LoRaClass::LoRaClass() :
-  _spi(SPI_PORT),
-  _ss(LORA_DEFAULT_SS_PIN), _reset(LORA_DEFAULT_RESET_PIN), _dio0(LORA_DEFAULT_DIO0_PIN),
-  _frequency(0),
-  _packetIndex(0),
-  _implicitHeaderMode(0),
-  _onReceive(NULL),
-  _onTxDone(NULL)
+LoRaClass::LoRaClass() : 
+      _spi(SPI_PORT),
+      _ss(LORA_DEFAULT_SS_PIN), _reset(LORA_DEFAULT_RESET_PIN), _dio0(LORA_DEFAULT_DIO0_PIN), 
+      _frequency(0), 
+      _packetIndex(0),
+      _implicitHeaderMode(0), 
+      _onReceive(NULL), 
+      _onCadDone(NULL),
+      _onTxDone(NULL) 
 {}
 
-int LoRaClass::begin(long frequency)
+int LoRaClass::begin(long frequency) 
 {
 
   // setup pins
   gpio_init(_ss);
-	gpio_set_dir(_ss, GPIO_OUT);
+  gpio_set_dir(_ss, GPIO_OUT);
   // set SS high
   gpio_put(_ss, 1);
 
   if (_reset != -1) {
     gpio_init(_reset);
-	  gpio_set_dir(_reset, GPIO_OUT);
+    gpio_set_dir(_reset, GPIO_OUT);
 
     // perform reset
     gpio_put(_reset, 0);
@@ -95,7 +97,7 @@ int LoRaClass::begin(long frequency)
     gpio_put(_reset, 1);
     sleep_ms(10);
   }
-  
+
 
   // start SPI
   spi_init(SPI_PORT, 12500);
@@ -109,11 +111,11 @@ int LoRaClass::begin(long frequency)
 
   gpio_init(PIN_CS);
   gpio_set_dir(PIN_CS, GPIO_OUT);
-  gpio_put(PIN_CS, 1);;
+  gpio_put(PIN_CS, 1);
 
   // Make the CS pin available to picotool
   bi_decl(bi_1pin_with_name(PIN_CS, "SPI CS"));
-  
+
   // check version
   uint8_t version = readRegister(REG_VERSION);
   if (version != 0x12) {
@@ -141,12 +143,11 @@ int LoRaClass::begin(long frequency)
 
   // put in standby mode
   idle();
-  
+
   return 1;
 }
 
-
-void LoRaClass::end()
+void LoRaClass::end() 
 {
   // put in sleep mode
   sleep();
@@ -155,7 +156,7 @@ void LoRaClass::end()
   spi_deinit(SPI_PORT);
 }
 
-int LoRaClass::beginPacket(int implicitHeader)
+int LoRaClass::beginPacket(int implicitHeader) 
 {
   if (isTransmitting()) {
     return 0;
@@ -169,7 +170,7 @@ int LoRaClass::beginPacket(int implicitHeader)
   } else {
     explicitHeaderMode();
   }
-  
+
   // reset FIFO address and paload length
   writeRegister(REG_FIFO_ADDR_PTR, 0);
   writeRegister(REG_PAYLOAD_LENGTH, 0);
@@ -177,15 +178,15 @@ int LoRaClass::beginPacket(int implicitHeader)
   return 1;
 }
 
-int LoRaClass::endPacket(bool async)
+int LoRaClass::endPacket(bool async) 
 {
-  
+
   if ((async) && (_onTxDone))
-      writeRegister(REG_DIO_MAPPING_1, 0x40); // DIO0 => TXDONE
+    writeRegister(REG_DIO_MAPPING_1, 0x40); // DIO0 => TXDONE
 
   // put in TX mode
   writeRegister(REG_OP_MODE, MODE_LONG_RANGE_MODE | MODE_TX);
-  
+
   if (!async) {
     // wait for TX done
     while ((readRegister(REG_IRQ_FLAGS) & IRQ_TX_DONE_MASK) == 0) {
@@ -198,7 +199,7 @@ int LoRaClass::endPacket(bool async)
   return 1;
 }
 
-bool LoRaClass::isTransmitting()
+bool LoRaClass::isTransmitting() 
 {
   if ((readRegister(REG_OP_MODE) & MODE_TX) == MODE_TX) {
     return true;
@@ -212,10 +213,10 @@ bool LoRaClass::isTransmitting()
   return false;
 }
 
-int LoRaClass::parsePacket(int size)
+int LoRaClass::parsePacket(int size) 
 {
   int packetLength = 0;
-  
+
   int irqFlags = readRegister(REG_IRQ_FLAGS);
 
   if (size > 0) {
@@ -228,7 +229,7 @@ int LoRaClass::parsePacket(int size)
   // clear IRQ's
   writeRegister(REG_IRQ_FLAGS, irqFlags);
   writeRegister(REG_IRQ_FLAGS, irqFlags);
-  
+
   if ((irqFlags & IRQ_RX_DONE_MASK) && (irqFlags & IRQ_PAYLOAD_CRC_ERROR_MASK) == 0) {
     // received a packet
     _packetIndex = 0;
@@ -258,17 +259,17 @@ int LoRaClass::parsePacket(int size)
   return packetLength;
 }
 
-int LoRaClass::packetRssi()
+int LoRaClass::packetRssi() 
 {
   return (readRegister(REG_PKT_RSSI_VALUE) - (_frequency < RF_MID_BAND_THRESHOLD ? RSSI_OFFSET_LF_PORT : RSSI_OFFSET_HF_PORT));
 }
 
-float LoRaClass::packetSnr()
+float LoRaClass::packetSnr() 
 {
   return ((int8_t)readRegister(REG_PKT_SNR_VALUE)) * 0.25;
 }
 
-long LoRaClass::packetFrequencyError()
+long LoRaClass::packetFrequencyError() 
 {
   int32_t freqError = 0;
   freqError = static_cast<int32_t>(readRegister(REG_FREQ_ERROR_MSB) & 0x111);
@@ -278,7 +279,7 @@ long LoRaClass::packetFrequencyError()
   freqError += static_cast<int32_t>(readRegister(REG_FREQ_ERROR_LSB));
 
   if (readRegister(REG_FREQ_ERROR_MSB) & 0x1000) { // Sign bit is on
-     freqError -= 524288; // B1000'0000'0000'0000'0000
+    freqError -= 524288;                           // B1000'0000'0000'0000'0000
   }
 
   const float fXtal = 32E6; // FXOSC: crystal oscillator (XTAL) frequency (2.5. Chip Specification, p. 14)
@@ -287,24 +288,24 @@ long LoRaClass::packetFrequencyError()
   return static_cast<long>(fError);
 }
 
-int LoRaClass::rssi()
+int LoRaClass::rssi() 
 {
   return (readRegister(REG_RSSI_VALUE) - (_frequency < RF_MID_BAND_THRESHOLD ? RSSI_OFFSET_LF_PORT : RSSI_OFFSET_HF_PORT));
 }
 
-size_t LoRaClass::write(uint8_t byte)
-{
-  return write(&byte, sizeof(byte));
+size_t LoRaClass::write(uint8_t byte) 
+{ 
+  return write(&byte, sizeof(byte)); 
 }
 
-size_t LoRaClass::write(const uint8_t *buffer, size_t size)
+size_t LoRaClass::write(const uint8_t *buffer, size_t size) 
 {
   int currentLength = readRegister(REG_PAYLOAD_LENGTH);
 
   // check size
   if ((currentLength + size) > MAX_PKT_LENGTH) {
     size = MAX_PKT_LENGTH - currentLength;
-  }  
+  }
 
   // write data
   for (size_t i = 0; i < size; i++) {
@@ -317,12 +318,12 @@ size_t LoRaClass::write(const uint8_t *buffer, size_t size)
   return size;
 }
 
-int LoRaClass::available()
+int LoRaClass::available() 
 {
   return (readRegister(REG_RX_NB_BYTES) - _packetIndex);
 }
 
-int LoRaClass::read()
+int LoRaClass::read() 
 {
   if (!available()) {
     return -1;
@@ -333,7 +334,7 @@ int LoRaClass::read()
   return readRegister(REG_FIFO);
 }
 
-int LoRaClass::peek()
+int LoRaClass::peek() 
 {
   if (!available()) {
     return -1;
@@ -351,11 +352,11 @@ int LoRaClass::peek()
   return b;
 }
 
-void LoRaClass::flush()
+void LoRaClass::flush() 
 {
 }
 
-void LoRaClass::onReceive(void(*callback)(int))
+void LoRaClass::onReceive(void(*callback)(int)) 
 {
   _onReceive = callback;
 
@@ -366,7 +367,19 @@ void LoRaClass::onReceive(void(*callback)(int))
   }
 }
 
-void LoRaClass::onTxDone(void(*callback)())
+void LoRaClass::onCadDone(void(*callback)(bool)) 
+{
+  _onCadDone = callback;
+
+  if (callback) {
+    gpio_set_irq_enabled_with_callback(_dio0, GPIO_IRQ_EDGE_RISE, true,
+                                       &LoRaClass::onDio0Rise);
+  } else {
+    gpio_set_irq_enabled(_dio0, GPIO_IRQ_EDGE_RISE, false);
+  }
+}
+
+void LoRaClass::onTxDone(void (*callback)()) 
 {
   _onTxDone = callback;
 
@@ -377,7 +390,7 @@ void LoRaClass::onTxDone(void(*callback)())
   }
 }
 
-void LoRaClass::receive(int size)
+void LoRaClass::receive(int size) 
 {
 
   writeRegister(REG_DIO_MAPPING_1, 0x00); // DIO0 => RXDONE
@@ -393,17 +406,23 @@ void LoRaClass::receive(int size)
   writeRegister(REG_OP_MODE, MODE_LONG_RANGE_MODE | MODE_RX_CONTINUOUS);
 }
 
-void LoRaClass::idle()
+void LoRaClass::channelActivityDetection(void) 
+{
+  writeRegister(REG_DIO_MAPPING_1, 0x80); // DIO0 => CADDONE
+  writeRegister(REG_OP_MODE, MODE_LONG_RANGE_MODE | MODE_CAD);
+}
+
+void LoRaClass::idle() 
 {
   writeRegister(REG_OP_MODE, MODE_LONG_RANGE_MODE | MODE_STDBY);
 }
 
-void LoRaClass::sleep()
+void LoRaClass::sleep() 
 {
   writeRegister(REG_OP_MODE, MODE_LONG_RANGE_MODE | MODE_SLEEP);
 }
 
-void LoRaClass::setTxPower(int level, int outputPin)
+void LoRaClass::setTxPower(int level, int outputPin) 
 {
   if (PA_OUTPUT_RFO_PIN == outputPin) {
     // RFO
@@ -440,7 +459,7 @@ void LoRaClass::setTxPower(int level, int outputPin)
   }
 }
 
-void LoRaClass::setFrequency(long frequency)
+void LoRaClass::setFrequency(long frequency) 
 {
   _frequency = frequency;
 
@@ -451,12 +470,12 @@ void LoRaClass::setFrequency(long frequency)
   writeRegister(REG_FRF_LSB, (uint8_t)(frf >> 0));
 }
 
-int LoRaClass::getSpreadingFactor()
+int LoRaClass::getSpreadingFactor() 
 {
   return readRegister(REG_MODEM_CONFIG_2) >> 4;
 }
 
-void LoRaClass::setSpreadingFactor(int sf)
+void LoRaClass::setSpreadingFactor(int sf) 
 {
   if (sf < 6) {
     sf = 6;
@@ -476,27 +495,27 @@ void LoRaClass::setSpreadingFactor(int sf)
   setLdoFlag();
 }
 
-long LoRaClass::getSignalBandwidth()
+long LoRaClass::getSignalBandwidth() 
 {
   uint8_t bw = (readRegister(REG_MODEM_CONFIG_1) >> 4);
 
   switch (bw) {
-    case 0: return 7.8E3;
-    case 1: return 10.4E3;
-    case 2: return 15.6E3;
-    case 3: return 20.8E3;
-    case 4: return 31.25E3;
-    case 5: return 41.7E3;
-    case 6: return 62.5E3;
-    case 7: return 125E3;
-    case 8: return 250E3;
-    case 9: return 500E3;
+  case 0: return 7.8E3;
+  case 1: return 10.4E3;
+  case 2: return 15.6E3;
+  case 3: return 20.8E3;
+  case 4: return 31.25E3;
+  case 5: return 41.7E3;
+  case 6: return 62.5E3;
+  case 7: return 125E3;
+  case 8: return 250E3;
+  case 9: return 500E3;
   }
 
   return -1;
 }
 
-void LoRaClass::setSignalBandwidth(long sbw)
+void LoRaClass::setSignalBandwidth(long sbw) 
 {
   int bw;
 
@@ -526,20 +545,20 @@ void LoRaClass::setSignalBandwidth(long sbw)
   setLdoFlag();
 }
 
-void LoRaClass::setLdoFlag()
+void LoRaClass::setLdoFlag() 
 {
   long symbolDuration = 1000 / ( getSignalBandwidth() / (1L << getSpreadingFactor()) ) ;
 
   bool ldoOn = symbolDuration > 16;
 
   uint8_t config3 = readRegister(REG_MODEM_CONFIG_3);
- 
+
   config3 = ldoOn ? config3 | (1 << 3) : config3 & ~(1 << 3);
-  
+
   writeRegister(REG_MODEM_CONFIG_3, config3);
 }
 
-void LoRaClass::setCodingRate4(int denominator)
+void LoRaClass::setCodingRate4(int denominator) 
 {
   if (denominator < 5) {
     denominator = 5;
@@ -552,62 +571,62 @@ void LoRaClass::setCodingRate4(int denominator)
   writeRegister(REG_MODEM_CONFIG_1, (readRegister(REG_MODEM_CONFIG_1) & 0xf1) | (cr << 1));
 }
 
-void LoRaClass::setPreambleLength(long length)
+void LoRaClass::setPreambleLength(long length) 
 {
   writeRegister(REG_PREAMBLE_MSB, (uint8_t)(length >> 8));
   writeRegister(REG_PREAMBLE_LSB, (uint8_t)(length >> 0));
 }
 
-void LoRaClass::setSyncWord(int sw)
-{
-  writeRegister(REG_SYNC_WORD, sw);
+void LoRaClass::setSyncWord(int sw) 
+{ 
+  writeRegister(REG_SYNC_WORD, sw); 
 }
 
-void LoRaClass::enableCrc()
+void LoRaClass::enableCrc() 
 {
   writeRegister(REG_MODEM_CONFIG_2, readRegister(REG_MODEM_CONFIG_2) | 0x04);
 }
 
-void LoRaClass::disableCrc()
+void LoRaClass::disableCrc() 
 {
   writeRegister(REG_MODEM_CONFIG_2, readRegister(REG_MODEM_CONFIG_2) & 0xfb);
 }
 
-void LoRaClass::enableInvertIQ()
+void LoRaClass::enableInvertIQ() 
 {
   writeRegister(REG_INVERTIQ,  0x66);
   writeRegister(REG_INVERTIQ2, 0x19);
 }
 
-void LoRaClass::disableInvertIQ()
+void LoRaClass::disableInvertIQ() 
 {
   writeRegister(REG_INVERTIQ,  0x27);
   writeRegister(REG_INVERTIQ2, 0x1d);
 }
 
-void LoRaClass::setOCP(uint8_t mA)
+void LoRaClass::setOCP(uint8_t mA) 
 {
   uint8_t ocpTrim = 27;
 
   if (mA <= 120) {
     ocpTrim = (mA - 45) / 5;
-  } else if (mA <=240) {
+  } else if (mA <= 240) {
     ocpTrim = (mA + 30) / 10;
   }
 
   writeRegister(REG_OCP, 0x20 | (0x1F & ocpTrim));
 }
 
-void LoRaClass::setGain(uint8_t gain)
+void LoRaClass::setGain(uint8_t gain) 
 {
   // check allowed range
   if (gain > 6) {
     gain = 6;
   }
-  
+
   // set to standby
   idle();
-  
+
   // set gain
   if (gain == 0) {
     // if gain = 0, enable AGC
@@ -615,30 +634,30 @@ void LoRaClass::setGain(uint8_t gain)
   } else {
     // disable AGC
     writeRegister(REG_MODEM_CONFIG_3, 0x00);
-	
+
     // clear Gain and set LNA boost
     writeRegister(REG_LNA, 0x03);
-	
+
     // set gain
     writeRegister(REG_LNA, readRegister(REG_LNA) | (gain << 5));
   }
 }
 
-uint8_t LoRaClass::random()
-{
-  return readRegister(REG_RSSI_WIDEBAND);
+uint8_t LoRaClass::random() 
+{ 
+  return readRegister(REG_RSSI_WIDEBAND); 
 }
 
-void LoRaClass::setPins(int ss, int reset, int dio0)
+void LoRaClass::setPins(int ss, int reset, int dio0) 
 {
   _ss = ss;
   _reset = reset;
   _dio0 = dio0;
 }
 
-void LoRaClass::setSPI(spi_inst_t& spi)
-{
-  _spi = &spi;
+void LoRaClass::setSPI(spi_inst_t& spi) 
+{ 
+  _spi = &spi; 
 }
 
 void LoRaClass::setSPIFrequency(uint32_t frequency)
@@ -646,28 +665,28 @@ void LoRaClass::setSPIFrequency(uint32_t frequency)
   spi_set_baudrate(SPI_PORT, frequency);
 }
 
-void LoRaClass::dumpRegisters()
+void LoRaClass::dumpRegisters() 
 {
   for (int i = 0; i < 128; i++) {
-    printf("0x%x: 0x%x\n",i,readRegister(i));
+    printf("0x%x: 0x%x\n", i, readRegister(i));
   }
 }
 
-void LoRaClass::explicitHeaderMode()
+void LoRaClass::explicitHeaderMode() 
 {
   _implicitHeaderMode = 0;
 
   writeRegister(REG_MODEM_CONFIG_1, readRegister(REG_MODEM_CONFIG_1) & 0xfe);
 }
 
-void LoRaClass::implicitHeaderMode()
+void LoRaClass::implicitHeaderMode() 
 {
   _implicitHeaderMode = 1;
 
   writeRegister(REG_MODEM_CONFIG_1, readRegister(REG_MODEM_CONFIG_1) | 0x01);
 }
 
-void LoRaClass::handleDio0Rise()
+void LoRaClass::handleDio0Rise() 
 {
   int irqFlags = readRegister(REG_IRQ_FLAGS);
 
@@ -675,7 +694,11 @@ void LoRaClass::handleDio0Rise()
   writeRegister(REG_IRQ_FLAGS, irqFlags);
   writeRegister(REG_IRQ_FLAGS, irqFlags);
 
-  if ((irqFlags & IRQ_PAYLOAD_CRC_ERROR_MASK) == 0) {
+  if ((irqFlags & IRQ_CAD_DONE_MASK) != 0) {
+    if (_onCadDone) {
+      _onCadDone((irqFlags & IRQ_CAD_DETECTED_MASK) != 0);
+    }
+  } else if ((irqFlags & IRQ_PAYLOAD_CRC_ERROR_MASK) == 0) {
 
     if ((irqFlags & IRQ_RX_DONE_MASK) != 0) {
       // received a packet
@@ -690,8 +713,7 @@ void LoRaClass::handleDio0Rise()
       if (_onReceive) {
         _onReceive(packetLength);
       }
-    }
-    else if ((irqFlags & IRQ_TX_DONE_MASK) != 0) {
+    } else if ((irqFlags & IRQ_TX_DONE_MASK) != 0) {
       if (_onTxDone) {
         _onTxDone();
       }
@@ -699,17 +721,17 @@ void LoRaClass::handleDio0Rise()
   }
 }
 
-uint8_t LoRaClass::readRegister(uint8_t address)
+uint8_t LoRaClass::readRegister(uint8_t address) 
 {
   return singleTransfer(address & 0x7f, 0x00);
 }
 
-void LoRaClass::writeRegister(uint8_t address, uint8_t value)
+void LoRaClass::writeRegister(uint8_t address, uint8_t value) 
 {
   singleTransfer(address | 0x80, value);
 }
 
-uint8_t LoRaClass::singleTransfer(uint8_t address, uint8_t value)
+uint8_t LoRaClass::singleTransfer(uint8_t address, uint8_t value) 
 {
   uint8_t response;
 
@@ -723,7 +745,7 @@ uint8_t LoRaClass::singleTransfer(uint8_t address, uint8_t value)
   return response;
 }
 
-void LoRaClass::onDio0Rise(uint gpio, uint32_t events)
+void LoRaClass::onDio0Rise(uint gpio, uint32_t events) 
 {
   gpio_acknowledge_irq(gpio, events);
   LoRa.handleDio0Rise();
